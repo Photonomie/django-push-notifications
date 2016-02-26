@@ -67,8 +67,7 @@ class APNSCertificate(object):
 		return app_settings.get(app_name)
 
 
-def _apns_create_socket(address_tuple):
-	certfile = SETTINGS.get("APNS_CERTIFICATE")
+def _apns_create_socket(address_tuple, certfile, ca_certs):
 	if not certfile:
 		raise ImproperlyConfigured(
 			'You need to set PUSH_NOTIFICATIONS_SETTINGS["APNS_CERTIFICATE"] to send messages through APNS.'
@@ -79,8 +78,6 @@ def _apns_create_socket(address_tuple):
 			f.read()
 	except Exception as e:
 		raise ImproperlyConfigured("The APNS certificate file at %r is not readable: %s" % (certfile, e))
-
-	ca_certs = SETTINGS.get("APNS_CA_CERTIFICATES")
 
 	sock = socket.socket()
 	sock = ssl.wrap_socket(sock, ssl_version=ssl.PROTOCOL_TLSv1, certfile=certfile, ca_certs=ca_certs)
