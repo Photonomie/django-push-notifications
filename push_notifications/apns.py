@@ -269,6 +269,16 @@ def apns_send_bulk_message(registration_ids, alert, app_name=None, **kwargs):
 		_apns_check_errors(socket)
 
 
+def apns_get_app_names():
+	"""
+	:return: the list of defined app names, or an empty list for the old config
+	"""
+	app_settings = SETTINGS.get("APNS_APPS", None)
+	if app_settings is None:
+		return []
+	return app_settings.keys()
+
+
 def apns_fetch_inactive_ids(app_name=None):
 	"""
 	Queries the APNS server for id's that are no longer active since

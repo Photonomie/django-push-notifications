@@ -1,9 +1,11 @@
 from django.apps import apps
 from django.contrib import admin, messages
 from django.utils.translation import ugettext_lazy as _
+from django.utils.text import slugify
 from .gcm import GCMError
 from .models import APNSDevice, GCMDevice, get_expired_tokens
 from .settings import PUSH_NOTIFICATIONS_SETTINGS as SETTINGS
+from .apns import apns_get_app_names
 
 
 User = apps.get_model(*SETTINGS["USER_MODEL"].split("."))
@@ -20,7 +22,7 @@ class DeviceAdmin(admin.ModelAdmin):
 	else:
 		search_fields = ("name", "device_id")
 
-	def send_messages(self, request, queryset, bulk=False):
+	def send_messages(self, request, queryset, bulk=False, app_name=None):
 		"""
 		Provides error handling for DeviceAdmin send_message and send_bulk_message methods.
 		"""
@@ -31,9 +33,9 @@ class DeviceAdmin(admin.ModelAdmin):
 		for device in queryset:
 			try:
 				if bulk:
-					r = queryset.send_message("Test bulk notification")
+					r = queryset.send_message("Test bulk notification", app_name=app_name)
 				else:
-					r = device.send_message("Test single notification")
+					r = device.send_message("Test single notification", app_name=app_name)
 				if r:
 					ret.append(r)
 			except GCMError as e:
@@ -83,5 +85,36 @@ class DeviceAdmin(admin.ModelAdmin):
 			d.save()
 
 
-admin.site.register(APNSDevice, DeviceAdmin)
-admin.site.register(GCMDevice, DeviceAdmin)
+class APNDeviceAdmin(DeviceAdmin):
+
+	def get_actions(self, request):
+		# get the default actions
+		actions = super(APNDeviceAdmin, self).get_actions(request)
+		app_names = apns_get_app_names()
+		if not app_names:
+			return actions
+
+		# in case of multiple apps defined, we remove the default `send_message` and `send_bulk_message`
+		if "send_message" in actions:
+			del actions["send_message"]
+		if "send_bulk_message" in actions:
+			del actions["send_bulk_message"]
+
+		# and replace it with specific app actions
+		for app_name in app_names:
+			action_key = "send_message_{}".format(slugify(app_name))
+			actions[action_key] = (
+				lambda modeladmin, req, queryset, captured_app_name=app_name: modeladmin.send_messages(req, queryset, app_name=captured_app_name),
+				action_key,
+				_("Send test message [{}]").format(app_name),
+			)
+
+		return actions
+
+
+class GCMDeviceAdmin(DeviceAdmin):
+	pass
+
+
+admin.site.register(APNSDevice, APNDeviceAdmin)
+admin.site.register(GCMDevice, GCMDeviceAdmin)
