@@ -96,5 +96,14 @@ class APNSDevice(Device):
 # This is an APNS-only function right now, but maybe GCM will implement it
 # in the future.  But the definition of 'expired' may not be the same. Whatevs
 def get_expired_tokens():
-	from .apns import apns_fetch_inactive_ids
-	return apns_fetch_inactive_ids()
+	from .apns import apns_fetch_inactive_ids, apns_get_app_names
+	expired_tokens = set()
+	app_names = apns_get_app_names()
+	if app_names:
+		# we iterate on all defined apps
+		for app_name in apns_get_app_names():
+			expired_tokens.update(apns_fetch_inactive_ids(app_name=app_name))
+	else:
+		# get the detault ids
+		expired_tokens.update(apns_fetch_inactive_ids())
+	return list(expired_tokens)
